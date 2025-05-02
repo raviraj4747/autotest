@@ -1,20 +1,17 @@
 name: Trigger Jenkins Build1
- 
+
 on:
   push:
     branches:
       - main
- 
+
 jobs:
   trigger-jenkins:
     runs-on: ubuntu-latest
- 
+
     steps:
       - name: Trigger Jenkins Builds
         run: |
           docker run --rm curlimages/curl:latest \
-          -X POST \
-https://jenkins.asahi-gh.com/job/automation-selenium/job/main/buildWithParameters \
-          --user "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}" \
-          --header "Content-Type: application/json" \
-          --data '{}'
+            -X POST \
+            https://jenkins.asahi-gh.com/job/automation-selenium/job/main/buildWithParameters
