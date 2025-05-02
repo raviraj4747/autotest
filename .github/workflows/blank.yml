@@ -1,4 +1,4 @@
-name: Trigger Jenkins Build and Fetch Artifacts1
+name: Trigger Jenkins Build and Fetch Artifacts
 
 on:
   push:
