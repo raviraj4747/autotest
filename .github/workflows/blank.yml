@@ -60,7 +60,7 @@ jobs:
           AUTH="${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
           echo "Waiting for Jenkins build to finish..."
 
-          for i in {1..60}; do
+          for i in {1..240}; do
             RESPONSE=$(curl -s -L "${BUILD_URL}api/json" --user "$AUTH")
             echo "Build API Response: $RESPONSE"
 
