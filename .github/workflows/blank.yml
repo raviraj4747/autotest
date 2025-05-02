@@ -91,6 +91,12 @@ jobs:
           mkdir -p jenkins-artifacts
 
           while IFS= read -r ARTIFACT_PATH; do
+            # Skip if the artifact path contains unresolved variables like $DEVICEFARM_LOG_DIR
+            if [[ "$ARTIFACT_PATH" == *"\$"* ]]; then
+              echo "Skipping invalid artifact path with unresolved variable: $ARTIFACT_PATH"
+              continue
+            fi
+
             FILE_NAME=$(basename "$ARTIFACT_PATH")
             echo "Downloading: $ARTIFACT_PATH"
             curl -s -O -J -L --user "$AUTH" "${BUILD_URL}artifact/$ARTIFACT_PATH"
