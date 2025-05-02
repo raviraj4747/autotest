@@ -1,4 +1,4 @@
-name: Trigger Jenkins Build1
+name: Trigger Jenkins Build
 
 on:
   push:
