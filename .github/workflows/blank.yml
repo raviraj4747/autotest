@@ -1,4 +1,4 @@
-name: Trigger Jenkins Build
+name: Trigger Jenkins Build and Fetch Artifacts
 
 on:
   push:
@@ -10,11 +10,81 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Trigger Jenkins Builds
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Trigger Jenkins Build
+        id: trigger
         run: |
-          docker run --rm curlimages/curl:latest \
-            -X POST \
-            http://54.92.26.219/job/Supplement_iOS/job/main/buildWithParameters \
-            --user "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}" \
+          JENKINS_URL="http://54.92.26.219"
+          JOB_PATH="/job/DDP_iOS/job/main"
+          AUTH="${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
+
+          echo "Triggering Jenkins build..."
+          RESPONSE_HEADERS=$(mktemp)
+          curl -X POST "$JENKINS_URL$JOB_PATH/buildWithParameters" \
+            --user "$AUTH" \
             --header "Content-Type: application/json" \
-            --data '{}'
+            --data '{}' \
+            -D $RESPONSE_HEADERS -o /dev/null
+
+          QUEUE_URL=$(grep -Fi Location $RESPONSE_HEADERS | awk '{print $2}' | tr -d '\r\n')
+          echo "QUEUE_URL=$QUEUE_URL" >> $GITHUB_ENV
+
+      - name: Get Jenkins Build URL
+        run: |
+          AUTH="${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
+          echo "Polling for actual build to start..."
+
+          for i in {1..30}; do
+            BUILD_URL=$(curl -s "${QUEUE_URL}api/json" --user "$AUTH" | jq -r '.executable.url // empty')
+            if [ -n "$BUILD_URL" ]; then
+              echo "Build URL: $BUILD_URL"
+              echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
+              break
+            fi
+            sleep 5
+          done
+
+          if [ -z "$BUILD_URL" ]; then
+            echo "Build didn't start in time."
+            exit 1
+          fi
+
+      - name: Wait for Jenkins Build to Finish
+        run: |
+          AUTH="${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
+          echo "Waiting for Jenkins build to finish..."
+
+          for i in {1..60}; do
+            RESULT=$(curl -s "${BUILD_URL}api/json" --user "$AUTH" | jq -r '.result // empty')
+            echo "Current result: $RESULT"
+            if [ "$RESULT" != "null" ] && [ -n "$RESULT" ]; then
+              echo "JENKINS_RESULT=$RESULT" >> $GITHUB_ENV
+              if [ "$RESULT" == "SUCCESS" ]; then
+                exit 0
+              else
+                exit 1
+              fi
+            fi
+            sleep 10
+          done
+
+          echo "Build did not complete in time."
+          exit 1
+
+      - name: Download Artifacts from Jenkins
+        if: env.JENKINS_RESULT == 'SUCCESS'
+        run: |
+          AUTH="${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
+          ARTIFACTS_JSON=$(curl -s "${BUILD_URL}api/json" --user "$AUTH")
+          echo "$ARTIFACTS_JSON" | jq -r '.artifacts[].relativePath' > artifact_paths.txt
+
+          mkdir -p jenkins-artifacts
+
+          while IFS= read -r ARTIFACT_PATH; do
+            FILE_NAME=$(basename "$ARTIFACT_PATH")
+            echo "Downloading $ARTIFACT_PATH..."
+            curl -s -O -J -L --user "$AUTH" "${BUILD_URL}artifact/$ARTIFACT_PATH"
+            mv "$FILE_NAME" jenkins-artifacts/
+          done < artifact_paths.txt
