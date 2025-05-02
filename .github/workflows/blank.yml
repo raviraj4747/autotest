@@ -73,7 +73,7 @@ jobs:
           echo "Build did not complete in time."
           exit 1
 
-      - name: Download Artifacts from Jenkins
+      - name: Download Artifacts from Jenkins1
         if: env.JENKINS_RESULT == 'SUCCESS'
         run: |
           AUTH="${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
