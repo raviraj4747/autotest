@@ -19,7 +19,6 @@ jobs:
           JENKINS_URL="http://54.92.26.219"
           JOB_PATH="/job/DDP_iOS/job/main"
           AUTH="${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
-
           echo "📣 Triggering Jenkins build..."
           RESPONSE_HEADERS=$(mktemp)
           curl -X POST "$JENKINS_URL$JOB_PATH/buildWithParameters" \
@@ -27,7 +26,6 @@ jobs:
             --header "Content-Type: application/json" \
             --data '{}' \
             -D $RESPONSE_HEADERS -o /dev/null
-
           QUEUE_URL=$(grep -Fi Location $RESPONSE_HEADERS | awk '{print $2}' | tr -d '\r\n')
           echo "✅ QUEUE_URL=$QUEUE_URL"
           echo "QUEUE_URL=$QUEUE_URL" >> $GITHUB_ENV
@@ -39,15 +37,16 @@ jobs:
           for i in {1..30}; do
             RESPONSE=$(curl -s -L "${QUEUE_URL}api/json" --user "$AUTH")
             BUILD_NUMBER=$(echo "$RESPONSE" | jq -r '.executable.number // empty')
+            DEVICEFARM_LOG_DIR=$(echo "$RESPONSE" | jq -r '.actions[0].parameters[] | select(.name == "DEVICEFARM_LOG_DIR") | .value // empty')
             if [ -n "$BUILD_NUMBER" ]; then
               BUILD_URL="http://54.92.26.219/job/DDP_iOS/job/main/$BUILD_NUMBER/"
               echo "✅ BUILD_URL=$BUILD_URL"
               echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
+              echo "DEVICEFARM_LOG_DIR=$DEVICEFARM_LOG_DIR" >> $GITHUB_ENV
               break
             fi
             sleep 5
           done
-
           if [ -z "$BUILD_NUMBER" ]; then
             echo "❌ Error: Jenkins build did not start in time."
             exit 1
@@ -71,7 +70,6 @@ jobs:
             fi
             sleep 10
           done
-
           echo "❌ Error: Jenkins build did not finish in time."
           exit 1
 
@@ -80,28 +78,25 @@ jobs:
         run: |
           AUTH="${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
           mkdir -p jenkins-artifacts
-
           echo "📦 Fetching list of artifacts..."
           ARTIFACTS_JSON=$(curl -s -L "${BUILD_URL}api/json" --user "$AUTH")
           echo "$ARTIFACTS_JSON" | jq -r '.artifacts[].relativePath' > artifact_paths.txt
-
           while IFS= read -r ARTIFACT_PATH; do
+            # Replace $DEVICEFARM_LOG_DIR in artifact paths with the environment variable value
+            ARTIFACT_PATH=$(echo "$ARTIFACT_PATH" | sed "s/\$DEVICEFARM_LOG_DIR/${{ env.DEVICEFARM_LOG_DIR }}/g")
             if [[ "$ARTIFACT_PATH" == *"\$"* ]]; then
               echo "⚠️ Skipping unresolved path: $ARTIFACT_PATH"
               continue
             fi
-
             FILE_NAME=$(basename "$ARTIFACT_PATH")
             ARTIFACT_URL="${BUILD_URL}artifact/$ARTIFACT_PATH"
             echo "⬇️ Downloading: $ARTIFACT_URL"
-
-            # Optional retry for flaky artifact availability
+            # Retry logic for flaky artifact availability
             for attempt in {1..3}; do
               curl -sf -O -J -L --user "$AUTH" "$ARTIFACT_URL" && break
               echo "⚠️ Retry $attempt failed. Retrying in 5s..."
               sleep 5
             done
-
             mv "$FILE_NAME" jenkins-artifacts/
           done < artifact_paths.txt
 
