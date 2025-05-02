@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Trigger Jenkins Build
+      - name: Trigger Jenkins Builds
         run: |
           docker run --rm curlimages/curl:latest \
             -X POST \
