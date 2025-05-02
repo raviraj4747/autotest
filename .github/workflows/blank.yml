@@ -29,7 +29,6 @@ jobs:
             -D $RESPONSE_HEADERS -o /dev/null
 
           QUEUE_URL=$(grep -Fi Location $RESPONSE_HEADERS | awk '{print $2}' | tr -d '\r\n')
-          echo "Queue URL: $QUEUE_URL"
           echo "QUEUE_URL=$QUEUE_URL" >> $GITHUB_ENV
 
       - name: Get Jenkins Build URL
@@ -41,8 +40,9 @@ jobs:
             RESPONSE=$(curl -s -L "${QUEUE_URL}api/json" --user "$AUTH")
             echo "Queue API Response: $RESPONSE"
 
-            BUILD_URL=$(echo "$RESPONSE" | jq -r '.executable.url // empty')
-            if [ -n "$BUILD_URL" ]; then
+            BUILD_NUMBER=$(echo "$RESPONSE" | jq -r '.executable.number // empty')
+            if [ -n "$BUILD_NUMBER" ]; then
+              BUILD_URL="http://54.92.26.219/job/DDP_iOS/job/main/$BUILD_NUMBER/"
               echo "Build URL: $BUILD_URL"
               echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
               break
@@ -50,7 +50,7 @@ jobs:
             sleep 5
           done
 
-          if [ -z "$BUILD_URL" ]; then
+          if [ -z "$BUILD_NUMBER" ]; then
             echo "Error: Build did not start in time."
             exit 1
           fi
