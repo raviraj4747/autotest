@@ -71,15 +71,6 @@ jobs:
           echo "❌ Error: Jenkins build did not finish in time."
           exit 1
 
-      - name: Extract DEVICEFARM_LOG_DIR
-        if: env.JENKINS_RESULT == 'SUCCESS'
-        run: |
-          AUTH="${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
-          RESPONSE=$(curl -s -L "${BUILD_URL}api/json" --user "$AUTH")
-          DEVICEFARM_LOG_DIR=$(echo "$RESPONSE" | jq -r '.actions[]?.parameters[]? | select(.name == "DEVICEFARM_LOG_DIR") | .value // empty')
-          echo "✅ DEVICEFARM_LOG_DIR=$DEVICEFARM_LOG_DIR"
-          echo "DEVICEFARM_LOG_DIR=$DEVICEFARM_LOG_DIR" >> $GITHUB_ENV
-
       - name: Download Artifacts from Jenkins
         if: env.JENKINS_RESULT == 'SUCCESS'
         run: |
@@ -89,10 +80,9 @@ jobs:
           ARTIFACTS_JSON=$(curl -s -L "${BUILD_URL}api/json" --user "$AUTH")
           echo "$ARTIFACTS_JSON" | jq -r '.artifacts[].relativePath' > artifact_paths.txt
           while IFS= read -r ARTIFACT_PATH; do
-            ARTIFACT_PATH=$(echo "$ARTIFACT_PATH" | sed "s/\\\$DEVICEFARM_LOG_DIR/${{ env.DEVICEFARM_LOG_DIR }}/g")
+            # Don't substitute anything — keep $DEVICEFARM_LOG_DIR literal
             if [[ "$ARTIFACT_PATH" == *"\$"* ]]; then
-              echo "⚠️ Skipping unresolved path: $ARTIFACT_PATH"
-              continue
+              echo "📁 Path contains literal $: $ARTIFACT_PATH"
             fi
             FILE_NAME=$(basename "$ARTIFACT_PATH")
             ARTIFACT_URL="${BUILD_URL}artifact/$ARTIFACT_PATH"
