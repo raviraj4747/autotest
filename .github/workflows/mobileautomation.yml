@@ -17,7 +17,7 @@ jobs:
         id: trigger
         run: |
           JENKINS_URL="http://54.92.26.219"
-          JOB_PATH="/job/DDP_iOS/job/main"
+          JOB_PATH="/Supplement_iOS/job/main"
           AUTH="${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
           echo "📣 Triggering Jenkins build..."
           RESPONSE_HEADERS=$(mktemp)
@@ -38,7 +38,7 @@ jobs:
             RESPONSE=$(curl -s -L "${QUEUE_URL}api/json" --user "$AUTH")
             BUILD_NUMBER=$(echo "$RESPONSE" | jq -r '.executable.number // empty')
             if [ -n "$BUILD_NUMBER" ]; then
-              BUILD_URL="http://54.92.26.219/job/DDP_iOS/job/main/$BUILD_NUMBER/"
+              BUILD_URL="http://54.92.26.219/job/Supplement_iOS/job/main/$BUILD_NUMBER/"
               echo "✅ BUILD_URL=$BUILD_URL"
               echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
               break
