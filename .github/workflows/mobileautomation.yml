@@ -1,4 +1,4 @@
-name: Trigger Jenkins Builds and Fetch index.html
+name: Trigger Jenkins Builds
 
 on:
   push:
